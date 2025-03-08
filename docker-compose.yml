@@ -1,7 +1,7 @@
 version: '3'
 
 services:
-  # Main application backend
+  # Flask Backend Application
   flask-backend:
     build: ./backend
     ports:
@@ -16,61 +16,70 @@ services:
       - TRANSLATION_API=http://translation-api:8000
       - TTS_API=http://tts-api:8000
       - DATABASE_PATH=/app/flashcards.db
+      - X_API_KEY=public  # Required for translation API
 
-  # RabbitMQ for message queue
+  # RabbitMQ Message Queue
   rabbitmq:
-    image: 'rabbitmq'
+    image: rabbitmq:3.9-management-alpine #'rabbitmq'
+    restart: always
     environment:
-      - RABBITMQ_DEFAULT_USER=guest
-      - RABBITMQ_DEFAULT_PASS=guest
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
+    ports:
+      - "5672:5672"  # RabbitMQ main port
+      - "15672:15672"  # Management UI
 
-  # Translation system
+  # Translation API
   translation-api:
     image: ghcr.io/tartunlp/translation-api:latest
+    platform: linux/amd64
     environment:
       - MQ_HOST=rabbitmq
       - MQ_PORT=5672
-      - MQ_USERNAME=guest
-      - MQ_PASSWORD=guest
+      - MQ_USERNAME=${RABBITMQ_USER}
+      - MQ_PASSWORD=${RABBITMQ_PASS}
     ports:
       - "8000:8000"
     depends_on:
       - rabbitmq
     restart: on-failure
 
+  # Translation Worker
   translation-worker:
     image: ghcr.io/tartunlp/translation-worker:latest
     environment:
       - MQ_HOST=rabbitmq
       - MQ_PORT=5672
-      - MQ_USERNAME=guest
-      - MQ_PASSWORD=guest
+      - MQ_USERNAME=${RABBITMQ_USER}
+      - MQ_PASSWORD=${RABBITMQ_PASS}
+      - MKL_NUM_THREADS=8  # Performance tuning
     command: ["--model-name", "septilang"]
     volumes:
       - ./models:/app/models
     depends_on:
       - rabbitmq
 
-  # Text-to-Speech system
+  # Text-to-Speech API
   tts-api:
     image: ghcr.io/tartunlp/text-to-speech-api:latest
     environment:
       - MQ_HOST=rabbitmq
       - MQ_PORT=5672
-      - MQ_USERNAME=guest
-      - MQ_PASSWORD=guest
+      - MQ_USERNAME=${RABBITMQ_USER}
+      - MQ_PASSWORD=${RABBITMQ_PASS}
     ports:
       - "8001:8000"
     depends_on:
       - rabbitmq
 
+  # Text-to-Speech Worker
   tts-worker:
     image: ghcr.io/tartunlp/text-to-speech-worker:latest
     environment:
       - MQ_HOST=rabbitmq
       - MQ_PORT=5672
-      - MQ_USERNAME=guest
-      - MQ_PASSWORD=guest
+      - MQ_USERNAME=${RABBITMQ_USER}
+      - MQ_PASSWORD=${RABBITMQ_PASS}
     command: ["--model-name", "multispeaker"]
     volumes:
       - ./models:/app/models
