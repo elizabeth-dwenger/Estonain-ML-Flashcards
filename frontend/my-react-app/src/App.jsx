@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
-import ImportWords from './components/ImportWords';
-import FlashcardStudy from './components/FlashcardStudy';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
@@ -89,19 +87,45 @@ function FlashcardStudy() {
   const [showTranslation, setShowTranslation] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [startTime, setStartTime] = useState(null);
-  const audioRef = useRef(null);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [audioElement, setAudioElement] = useState(null);
   
   useEffect(() => {
+    // Create audio element
+    const audio = new Audio();
+    setAudioElement(audio);
+    
+    // Fetch initial cards
     fetchRecommendations();
+    
+    // Cleanup audio element on unmount
+    return () => {
+      if (audio) {
+        audio.pause();
+        audio.src = '';
+      }
+    };
   }, []);
+  
+  useEffect(() => {
+    // Update audio URL when currentCardIndex changes
+    if (cards.length > 0 && currentCardIndex < cards.length) {
+      setAudioUrl(`${API_BASE_URL}/audio/${cards[currentCardIndex].id}`);
+    }
+  }, [currentCardIndex, cards]);
   
   const fetchRecommendations = async () => {
     setIsLoading(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/recommendations?count=10`);
-      setCards(response.data);
-      setCurrentCardIndex(0);
-      setShowTranslation(false);
+      if (response.data && response.data.length > 0) {
+        setCards(response.data);
+        setCurrentCardIndex(0);
+        setShowTranslation(false);
+      } else {
+        // Handle empty response
+        setCards([]);
+      }
     } catch (error) {
       console.error('Error fetching recommendations:', error);
     } finally {
@@ -110,14 +134,12 @@ function FlashcardStudy() {
   };
   
   const playAudio = async () => {
-    if (!cards.length) return;
+    if (!cards.length || !audioElement || !audioUrl) return;
     
-    const currentCard = cards[currentCardIndex];
     try {
-      if (audioRef.current) {
-        audioRef.current.src = `${API_BASE_URL}/audio/${currentCard.id}`;
-        await audioRef.current.play();
-      }
+      audioElement.src = audioUrl;
+      await audioElement.load();
+      await audioElement.play();
     } catch (error) {
       console.error('Error playing audio:', error);
     }
@@ -130,6 +152,8 @@ function FlashcardStudy() {
   };
   
   const handleResponse = async (correct) => {
+    if (!startTime) return;
+    
     const responseTime = (Date.now() - startTime) / 1000; // Convert to seconds
     
     try {
@@ -176,7 +200,6 @@ function FlashcardStudy() {
           <button className="audio-btn" onClick={playAudio}>
             🔊 Listen
           </button>
-          <audio ref={audioRef} />
         </div>
         
         {showTranslation ? (

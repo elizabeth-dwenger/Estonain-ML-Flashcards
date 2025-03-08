@@ -1,14 +1,78 @@
 version: '3'
 
 services:
+  # Main application backend
+  flask-backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - ./audio:/app/audio
+    depends_on:
+      - translation-api
+      - tts-api
+    environment:
+      - TRANSLATION_API=http://translation-api:8000
+      - TTS_API=http://tts-api:8000
+      - DATABASE_PATH=/app/flashcards.db
+
+  # RabbitMQ for message queue
+  rabbitmq:
+    image: 'rabbitmq'
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+
+  # Translation system
   translation-api:
-    image: ghcr.io/tartunlp/translation-worker:latest
+    image: ghcr.io/tartunlp/translation-api:latest
+    environment:
+      - MQ_HOST=rabbitmq
+      - MQ_PORT=5672
+      - MQ_USERNAME=guest
+      - MQ_PASSWORD=guest
     ports:
       - "8000:8000"
-    restart: unless-stopped
+    depends_on:
+      - rabbitmq
+    restart: on-failure
 
+  translation-worker:
+    image: ghcr.io/tartunlp/translation-worker:latest
+    environment:
+      - MQ_HOST=rabbitmq
+      - MQ_PORT=5672
+      - MQ_USERNAME=guest
+      - MQ_PASSWORD=guest
+    command: ["--model-name", "septilang"]
+    volumes:
+      - ./models:/app/models
+    depends_on:
+      - rabbitmq
+
+  # Text-to-Speech system
   tts-api:
     image: ghcr.io/tartunlp/text-to-speech-api:latest
+    environment:
+      - MQ_HOST=rabbitmq
+      - MQ_PORT=5672
+      - MQ_USERNAME=guest
+      - MQ_PASSWORD=guest
     ports:
       - "8001:8000"
-    restart: unless-stopped
+    depends_on:
+      - rabbitmq
+
+  tts-worker:
+    image: ghcr.io/tartunlp/text-to-speech-worker:latest
+    environment:
+      - MQ_HOST=rabbitmq
+      - MQ_PORT=5672
+      - MQ_USERNAME=guest
+      - MQ_PASSWORD=guest
+    command: ["--model-name", "multispeaker"]
+    volumes:
+      - ./models:/app/models
+    depends_on:
+      - rabbitmq

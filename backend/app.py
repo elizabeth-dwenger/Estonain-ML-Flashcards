@@ -35,7 +35,7 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", "flashcards.db")
 
 # Database setup
 def get_db_connection():
-    conn = sqlite3.connect('flashcards.db')
+    conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -134,18 +134,26 @@ def translate_word(estonian_word):
     try:
         payload = {
             "text": estonian_word,
-            "source_language": "et",
-            "target_language": "en"
+            "src": "et",
+            "tgt": "en",
+            "domain": "auto",
+            "application": "flashcard-app"
+        }
+        
+        headers = {
+            "x-api-key": "public",
+            "Content-Type": "application/json"
         }
         
         response = requests.post(
             f"{TRANSLATION_API}/translate",
-            json=payload
+            json=payload,
+            headers=headers
         )
         
         if response.status_code == 200:
             result = response.json()
-            return result.get("translation", "")
+            return result.get("result", "")
         else:
             logger.error(f"Translation API error: {response.text}")
             return ""
@@ -159,7 +167,8 @@ def generate_audio(estonian_word, word_id):
     try:
         payload = {
             "text": estonian_word,
-            "language": "et"
+            "speaker": "mari",  # Use Mari as default speaker
+            "speed": 1.0
         }
         
         response = requests.post(
@@ -167,7 +176,7 @@ def generate_audio(estonian_word, word_id):
             json=payload
         )
         
-        if response.status_code == 200:
+        if response.status_code == 200 and response.content:
             # Save audio file
             audio_dir = os.path.join(os.getcwd(), 'audio')
             os.makedirs(audio_dir, exist_ok=True)
@@ -178,7 +187,7 @@ def generate_audio(estonian_word, word_id):
                 
             return audio_path
         else:
-            logger.error(f"TTS API error: {response.text}")
+            logger.error(f"TTS API error: {response.status_code} - {response.text}")
             return None
     
     except Exception as e:
@@ -194,14 +203,58 @@ def get_recommendations():
     conn = get_db_connection()
     
     # Get study history for ML model
-    study_history = pd.DataFrame(conn.execute('''
+    study_sessions = conn.execute('''
         SELECT word_id as card_id, correct, response_time, timestamp
         FROM study_sessions
         WHERE user_id = ?
-    ''', (user_id,)).fetchall())
+    ''', (user_id,)).fetchall()
     
-    if len(study_history) < 5:
-        # Not enough data for ML, return random words
+    # Convert to dataframe
+    if study_sessions:
+        study_history = pd.DataFrame(study_sessions)
+        
+        # Convert timestamp string to datetime
+        study_history['timestamp'] = pd.to_datetime(study_history['timestamp'])
+        
+        if len(study_history) >= 5:
+            # Use ML model for recommendations
+            try:
+                # Train model if needed
+                if not hasattr(recommender, 'model_trained') or not recommender.model_trained:
+                    recommender.train(study_history)
+                    recommender.model_trained = True
+                    
+                recommended_ids = recommender.get_recommendations(study_history, n=count)
+                
+                # Get recommended words
+                placeholders = ','.join(['?'] * len(recommended_ids))
+                words = conn.execute(f'''
+                    SELECT id, estonian, translation, audio_path
+                    FROM words
+                    WHERE id IN ({placeholders})
+                    AND translation IS NOT NULL
+                ''', recommended_ids).fetchall()
+            except Exception as e:
+                logger.error(f"Error using ML model: {e}")
+                # Fallback to random selection
+                words = conn.execute('''
+                    SELECT id, estonian, translation, audio_path
+                    FROM words
+                    WHERE translation IS NOT NULL
+                    ORDER BY RANDOM()
+                    LIMIT ?
+                ''', (count,)).fetchall()
+        else:
+            # Not enough data for ML, return random words
+            words = conn.execute('''
+                SELECT id, estonian, translation, audio_path
+                FROM words
+                WHERE translation IS NOT NULL
+                ORDER BY RANDOM()
+                LIMIT ?
+            ''', (count,)).fetchall()
+    else:
+        # No study history, return random words
         words = conn.execute('''
             SELECT id, estonian, translation, audio_path
             FROM words
@@ -209,17 +262,6 @@ def get_recommendations():
             ORDER BY RANDOM()
             LIMIT ?
         ''', (count,)).fetchall()
-    else:
-        # Use ML model for recommendations
-        recommended_ids = recommender.get_recommendations(study_history, n=count)
-        
-        # Get recommended words
-        placeholders = ','.join(['?'] * len(recommended_ids))
-        words = conn.execute(f'''
-            SELECT id, estonian, translation, audio_path
-            FROM words
-            WHERE id IN ({placeholders})
-        ''', recommended_ids).fetchall()
     
     conn.close()
     
@@ -246,9 +288,6 @@ def log_study_session():
     conn.commit()
     conn.close()
     
-    # Update ML model (in production, do this asynchronously)
-    # recommender.update_recommendations(data.get('user_id', 1))
-    
     return jsonify({"success": True})
 
 @app.route('/api/audio/<int:word_id>', methods=['GET'])
@@ -263,4 +302,4 @@ def get_audio(word_id):
     return send_file(word['audio_path'], mimetype='audio/mpeg')
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0')
