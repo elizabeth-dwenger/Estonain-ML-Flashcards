@@ -1,0 +1,216 @@
+/* App.css */
+
+:root {
+  --primary-color: #4a90e2;
+  --secondary-color: #50c878;
+  --error-color: #e25c5c;
+  --dark-color: #333;
+  --light-color: #f4f4f4;
+  --transition: all 0.3s ease;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+  background-color: var(--light-color);
+  color: var(--dark-color);
+  padding: 20px;
+}
+
+.app {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.app-header h1 {
+  color: var(--primary-color);
+}
+
+/* Import section styles */
+.import-section {
+  margin-bottom: 40px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+}
+
+.import-section h2 {
+  margin-bottom: 15px;
+  color: var(--dark-color);
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+button {
+  padding: 10px 15px;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+button:hover {
+  background-color: #3a78c2;
+}
+
+button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.message {
+  margin-top: 15px;
+  padding: 10px;
+  border-radius: 4px;
+  background-color: #e3f2fd;
+  color: var(--primary-color);
+}
+
+/* Flashcard styles */
+.flashcard-container {
+  text-align: center;
+}
+
+.flashcard-container h2 {
+  margin-bottom: 25px;
+  color: var(--dark-color);
+}
+
+.flashcard {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  min-height: 280px;
+  margin: 0 auto 30px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.card-front, .card-back {
+  margin-bottom: 20px;
+}
+
+.card-front h3, .card-back h3 {
+  font-size: 24px;
+  margin-bottom: 15px;
+}
+
+.audio-btn {
+  background-color: transparent;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  padding: 5px 10px;
+  margin-top: 10px;
+}
+
+.audio-btn:hover {
+  background-color: #f0f7ff;
+}
+
+.show-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  margin-top: 20px;
+}
+
+.response-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.response-buttons button {
+  width: 48%;
+  padding: 12px;
+  font-size: 16px;
+}
+
+.correct-btn {
+  background-color: var(--secondary-color);
+}
+
+.correct-btn:hover {
+  background-color: #40a860;
+}
+
+.incorrect-btn {
+  background-color: var(--error-color);
+}
+
+.incorrect-btn:hover {
+  background-color: #c44a4a;
+}
+
+.progress {
+  margin-top: 20px;
+  color: #777;
+  font-size: 14px;
+}
+
+.loading, .no-cards {
+  text-align: center;
+  padding: 40px;
+  color: #777;
+  font-size: 18px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .app {
+    padding: 15px;
+  }
+  
+  .flashcard {
+    min-height: 230px;
+    padding: 20px;
+  }
+  
+  .response-buttons {
+    flex-direction: column;
+  }
+  
+  .response-buttons button {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+}
